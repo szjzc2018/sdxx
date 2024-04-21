@@ -1,0 +1,14 @@
+1. 安装texlive 失败
+
+移除锁 
+sudo rm /var/cache/apt/archives/lock
+sudo rm /var/lib/dpkg/updates/*
+
+-- 在dpkg 里面 
+sudo dpkg -r texlive-full
+sudo killall dpkg
+
+在 /var/cache/apt/archives 中把相关全删掉
+
+sudo apt-get update
+sudo apt-get upgrade 中 n, autoremove
