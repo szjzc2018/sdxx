@@ -1,0 +1,149 @@
+\documentclass[a4 paper,12pt]{article}
+\usepackage[inner=2.0cm,outer=2.0cm,top=2.0cm,bottom=2.0cm]{geometry}
+\linespread{1.1}
+\usepackage{setspace}
+\usepackage[rgb]{xcolor}
+\usepackage{verbatim}
+\usepackage{subcaption}
+\usepackage{fancyhdr}
+\usepackage{fullpage}
+\usepackage[colorlinks=true, urlcolor=blue, linkcolor=blue, citecolor=blue]{hyperref}
+\usepackage{booktabs}
+\usepackage{amsmath,amsfonts,amsthm,amssymb}
+\usepackage[shortlabels]{enumitem}
+\usepackage{setspace}
+\usepackage{extramarks}
+\usepackage{soul,color}
+\usepackage{graphicx,float,wrapfig}
+\newcommand{\homework}[3]{
+	\pagestyle{myheadings}
+	\thispagestyle{plain}
+	\newpage
+	\setcounter{page}{1}
+	\noindent
+	\begin{center}
+		\framebox{
+			\vbox{\vspace{2mm}
+				\hbox to 6.28in { {\bf DL \hfill} {\hfill {\rm #2} {\rm #3}} }
+				\vspace{4mm}
+				\hbox to 6.28in { {\Large \hfill #1  \hfill} }
+				\vspace{3mm}}
+		}
+	\end{center}
+	\vspace*{4mm}
+}
+\newcommand\numberthis{\addtocounter{equation}{1}\tag{\theequation}}
+\begin{document}
+\homework{Assignment 2}{2023040165}{Zhicheng Jiang}
+\section*{Question 1 to 2}
+True. True.
+\section*{Question 3}
+\subsection*{1.}
+To use Hopfield network to retrieve noisy images,
+we can use the following steps:
+\begin{enumerate}
+    \item suppose the noisy image is $x \in R^{n}$
+    \item each time, we update the entry $x_i$ of $x$ by
+          $x_i = sign(\sum_{j=1}^{n}w_{ij}x_j)$ (i=1,2,...,n)
+    \item When the update process converges, we get the
+          denoised image.
+\end{enumerate}
+To use Hopfield network to retrieve masked images,
+we can use the following steps:
+\begin{enumerate}
+    \item suppose the masked image is $x \in R^{n}$,
+          and the masked part is $x_i (i\in I)$
+    \item each time, we update the entry $x_i$ of $x$ by
+          $x_i = sign(\sum_{j=1}^{n}w_{ij}x_j)$ (i=$\{1,2,...,n\}-I$)
+    \item When the update process converges, we get the
+          unmasked image.
+\end{enumerate}
+\subsection*{2.}
+We can calculate that $\forall x$, 
+\[
+    E(x)=-\frac{1}{2N}x^T(\sum_{p}y_py_p^T)x
+    =-\frac{1}{2N}\sum_{p} x^Ty_p(y_p^Tx)
+    =-\frac{1}{2N}\sum_{p}||y_p^Tx||^2
+    =-\frac{||x||^2}{2N}=-\frac{1}{2}
+\]
+Thus, all the patterns have the same energy,
+that is, it memorizes $2^N$ patterns.
+\section*{Question 4}
+(Prove of the gradient of the Boltzmann machine)\\
+\[\nabla_{W} L(W)=\nabla_{W}(-\frac{1}{|P|}\sum_{v\in P}
+log(\sum_{h}\mathbb{P}(v,h)))\]
+\[=\nabla_{W}(-\frac{1}{|P|}\sum_{v\in P}
+log(\sum_{h}\frac{\exp(y^TWy)}{\sum_{y'}\exp(y'^TWy')}))\]
+\[=\nabla_{W}(-\frac{1}{|P|}\sum_{v\in P}
+log(\sum_{h}\exp(y^TWy)))+ \nabla_{W}(log{\sum_{y'}\exp(y'^TWy')})\]
+\[=\nabla_{W}(-\frac{1}{|P|}\sum_{v\in P}
+log(\sum_{h}\exp(y^TWy)))+ \nabla_{W}(log{\sum_{y'}\exp(y'^TWy')})\]
+\[=-\frac{1}{|P|}\sum_{v\in P}
+\nabla_{W}log(\sum_{h}\exp(y^TWy))+ \nabla_{W}(log{\sum_{y'}\exp(y'^TWy')})\]
+\[=-\frac{1}{|P|}\sum_{v\in P}
+\frac{\sum_{h}\exp(y^TWy)(y^Ty)}{\sum_{h}\exp(y^TWy)}+ \sum_y\frac{y^Ty \exp(y^TWy)}{\sum_{y'} \exp(y'^TWy')}\]
+\[=-\frac{1}{|P|}\sum_{v\in P} \sum_h y^Ty \mathbb{P}(v,h)+ \sum_y y^Ty \mathbb{P}(y)\]
+\[=-\frac{1}{|P|}\sum_{v\in P}(\mathbb{E}_{h|v}[yy^T]-\mathbb{E}_{y'}[y'y'^T])\]
+\section*{Question 5}
+(Gaussian RBM)\\
+Energy:
+\begin{equation}
+      \mathcal{E}_{W,b}(v,h) = \frac{1}{2}(v-b)^T(v-b) - v^TWh
+\end{equation}
+1. 
+\[ \mathbb{P}(v|h) = \frac{1}{Z_h} \exp(-\mathcal{E}_{W,b}(v,h))\]
+\[ Z_h =\int_{v} \exp(-\mathcal{E}_{W,b}(v,h))dv \]
+\[ =\int_{v} \exp(-\frac{1}{2}(v-b)^T(v-b) + v^TWh)dv \]
+\[ =\int_{v} \exp(-\frac{1}{2}v^Tv + (v+b)^TWh)dv \]
+\[ =e^{b^TWh} \int_{v} \exp(-\frac{1}{2}v^Tv + v^TWh)dv \]
+\[ =e^{b^TWh+\frac{(Wh)^TWh}{2}} \int_{v} \exp(-\frac{1}{2}(v-Wh)^T(v-Wh))dv \]
+\[ =e^{(b+\frac{Wh}{2})^TWh} \int_{v} \exp(-\frac{1}{2}v^2)dv\]
+\[ =e^{(b+\frac{Wh}{2})^TWh} (\sqrt{2\pi})^{N_v} \]
+
+So,
+\[ \mathbb{P}(v|h) = \frac{1}{Z} \exp(-\mathcal{E}_{W,b}(v,h)) = \frac{1}{(\sqrt{2\pi})^{N_v}} \exp(-\frac{1}{2}(v-b)^T(v-b) + v^TWh - (b+\frac{Wh}{2})^TWh) \]
+\[ = \frac{1}{(\sqrt{2\pi})^{N_v}} \exp(-\frac{1}{2}(v-b)^T(v-b) + v^TWh - (b^TWh+\frac{(Wh)^TWh}{2})) \]
+\[ = \frac{\exp(-\frac{1}{2}(v-b)^T(v-b) + v^TWh - b^TWh-\frac{(Wh)^TWh}{2})}{(\sqrt{2\pi})^{N_v}}  \]
+\[ = \frac{\exp(-\frac{1}{2}||v-b-Wh||^2)}{(\sqrt{2\pi})^{N_v}}  \]
+2.
+Similarly to Problem 4.2, we can get
+\[ \nabla_b L(W,b) = -\frac{1}{|P|}\sum_{v\in P}(\mathbb{E}_{h|v}[\nabla_b\mathcal{E}] - \mathbb{E}[\nabla_{b}\mathcal{E}]) \]
+since 
+\[ \nabla_b\mathcal{E} = v-b\]
+we know
+\[ \nabla_b L(W,b) = -\frac{1}{|P|}\sum_{v\in P}(\mathbb{E}_{h|v}[v-b] - \mathbb{E}[v-b]) \]
+\[ = - \mathbb{E}_{v \in P}[v] + \mathbb{E}_v[v] \]
+
+\section*{Question 6}
+1. D and F are not independent generally, since the joint distribution of D and F is
+\[ \mathbb{P}(D|F) = \frac{\mathbb{P}(D,F)}{\mathbb{P}(F)} = \frac{\mathbb{P}(D,F)}{\sum_{D'}\mathbb{P}(D,F)} \]
+\[ = \frac{f_{AD}(A,D)f_{AE}(A,E)f_{EF}(E,F)}{\sum_{D'}f_{AD}(A,D')f_{AE}(A,E)f_{EF}(E,F)}\]
+which generally doesn't equal to $\mathbb{P}(D)$.
+
+2. 
+\[ \mathbb{P}(B,E|A)= \frac{\mathbb{P}(BEA)}{\mathbb{P}(A)}\]
+\[ = \frac{\sum_{C'}\mathbb{P}(BEAC')}{\sum_{C'}\mathbb{P}(AC')}\]
+\[ = \frac{\sum_{C'}f_{BC}(B,C')f_{AE}(A,E)f_{AC}(A,C')}{\sum_{C}f_{AC}(A,C')}\]
+
+B and E are conditionally independent given A, because
+\[ \mathbb{P}(B|A) = \frac{\mathbb{P}(BA)}{\mathbb{P}(A)} = \frac{\sum_{C'}\mathbb{P}(BAC')}{\sum_{C'}\mathbb{P}(AC')}\]
+\[ = \frac{\sum_{C'}f_{BC}(B,C')f_{AC}(A,C')}{\sum_{C'}f_{AC}(A,C')}\]
+
+\[ \mathbb{P}(E|A) = \frac{\mathbb{P}(EA)}{\mathbb{P}(A)} = \frac{\sum_{C'}\mathbb{P}(EAC')}{\sum_{C'}\mathbb{P}(AC')}\]
+\[ = \frac{\sum_{C'}f_{AE}(A,E)f_{AC}(A,C')}{\sum_{C'}f_{AC}(A,C')}\]
+
+thus, 
+\[ \mathbb{P}(B|A) \mathbb{P}(E|A) \]
+\[ = \frac{\sum_{C'}f_{BC}(B,C')f_{AC}(A,C')}{\sum_{C'}f_{AC}(A,C')} \frac{\sum_{C'}f_{AE}(A,E)f_{AC}(A,C')}{\sum_{C'}f_{AC}(A,C')} \]
+\[ = \frac{\sum_{C'}f_{BC}(B,C')f_{AC}(A,C')f_{AE}(A,E)f_{AC}(A,C')}{(\sum_{C'}f_{AC}(A,C'))^2} \]
+\[ = \frac{\sum_{C'}f_{BC}(B,C')f_{AE}(A,E)f_{AC}(A,C')}{\sum_{C'}f_{AC}(A,C')} \]
+\[ = \frac{\sum_{C'}f_{BC}(B,C')f_{AE}(A,E)f_{AC}(A,C')}{\sum_{C}f_{AC}(A,C')} \]
+\[ = \mathbb{P}(B,E|A) \]
+
+3.
+That's because the joint probability
+\[ \mathbb{P}(A,B,C,D,E,F) = \frac{1}{Z} f_{BC}(B,C)f_{AC}(A,C)f_{AD}(A,D)f_{AE}(A,E)f_{EF}(E,F) \]
+So the energy function $\mathcal{E}(A,B,C,D,E,F)$ can be expressed
+by $\mathcal{E}(A,C), \mathcal{E}(A,D), \mathcal{E}(A,E),$\\$ \mathcal{E}(B,C), \mathcal{E}(E,F)$ 
+(just let the energy function be the minus log of the joint probability)
+\end{document}
