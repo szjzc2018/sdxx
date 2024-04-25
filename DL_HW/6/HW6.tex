@@ -34,6 +34,22 @@
 }
 \newcommand\numberthis{\addtocounter{equation}{1}\tag{\theequation}}
 \begin{document}
-\homework{Assignment}{2023040165}{Zhicheng Jiang}
+\homework{Assignment 6}{2023040165}{Zhicheng Jiang}
+
+\subsection*{6.1}
+
+For simplicity, we denote $u^\theta(w,h) = u$, 
+and $q(w),q(\bar{w}) =q$
+
+Then,
+$$\nabla L_{NCE} = \sum_w \nabla(\tilde{p}(w|h)\log\frac{u}{u+kq}+kq\log\frac{kq}{u+kq})$$
+$$ =\sum_w [\tilde{p}(w|h)\nabla\log\frac{u}{u+kq}+kq\nabla\log\frac{kq}{u+kq}]$$
+$$ =\sum_w [\tilde{p}(w|h)\cdot\frac{u+kq}{u}\cdot\frac{kq\nabla u}{(u+kq)^2} - kq\frac{u+kq}{kq}\frac{-kq\nabla u}{(u+kq)^2}]$$
+$$ =\sum_w [\tilde{p}(w|h)\cdot\frac{kq\nabla u}{u(u+kq)} + \frac{kq\nabla u}{u+kq}]$$
+$$ =\frac{kq}{u+kq}\sum_w((\tilde{p}(w|h)-u)\frac{\nabla u}{u})$$
+$$ =\frac{kq}{u+kq}\sum_w((\tilde{p}(w|h)-u)\nabla (\log u))$$
+$$ \approx \sum_w((\tilde{p}(w|h)-p^\theta(w|h))\nabla (\log u))$$
+$$ =\nabla L_{MLE}$$
+The "$\approx$" sign achieves when$k \to \infty$, and $p^\theta(w|h) = u$
 
 \end{document}
