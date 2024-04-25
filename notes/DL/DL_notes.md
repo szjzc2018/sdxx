@@ -580,11 +580,11 @@ $$h_t=(1-z_t)\circ h_{t-1}+z_t\circ \tilde{h_t}$$
 ![alt text](image-11.png)
 
 ### 3.4 Language Model
+
+#### 3.4.1 LSTM Language Model
 我们接下来关注一类特殊的模型:Language Model.
 具体地，我们要训练一个模型，给定$x_1,x_2,...,x_{t-1}$,我们希望预测下一个词$x_t$的概率分布
 $$p(x_t|x_1,x_2,...,x_{t-1})$$
-
-#### 3.4.1 LSTM Language Model
 
 LSTM Language Model的结构很简单，我们只需要把LSTM的输出接一个softmax层即可。
 
@@ -628,7 +628,11 @@ $$L(w,c) = \sum_{c=(x,y)\in D^+} \log Pr(c,+)-\sum_{c=(x,y)\in D^-} \log Pr(c,-)
 
 另一种结构是Skip-gram,它的想法是，我们希望通过一个词来预测它的上下文，从而学到一个好的embedding.具体地，我们在训练语料$x_{-k}x_{-k+1}\dots x_{-1}yx_1 \dots x_{k-1}x_{k}$的中的${x_i}$里随机选择$R$个词作为$y$的上下文$x$,然后把这些$(x,y)$作为正例，然后随机采样$R$个词构成$\tilde{x}$,让$(\tilde{x},y)$作为负例，然后进行一样的训练。
 
-#### 3.4.3 Noise Contrastive Estimation(NCE)
+#### 3.4.3 Some Techniques on Language Model
+
+##### 3.4.3.1 Make Training Fast: Noise Contrastive Estimation(NCE)
+
+tldr:这一小节讲了一个加速训练的方法:NCE,它的想法和之前类似，把多分类问题转化为二分类问题。本节主要是数学计算，如果不感兴趣，可以跳过，对理解整体内容没有太大影响。
 
 回顾我们的Language Model的训练，具体地，我们希望我们模型输出的概率分布和真实分布（训练的时候，就是训练语料的分布）接近，于是我们用MLE的方法优化我们的模型，在这里，我们先定义一些符号:
 <span id="def"></span>
@@ -642,6 +646,8 @@ $$L(w,c) = \sum_{c=(x,y)\in D^+} \log Pr(c,+)-\sum_{c=(x,y)\in D^-} \log Pr(c,-)
 
 我们的目标是:
 > $$p_{\theta}(w|h) \approx \tilde{p}(w|h) $$
+
+你可能会有疑问，为什么训练集合是个概率分布？这是因为i同一个词可能多次出现，比如说训练语料集合是$\{$"我是人","你很强","我爆零了","我是吊打"$\}$,那么给定上文"我",下一个词应该是一个概率分布:("是",$p=\frac{2}{3}$),("爆",$p=\frac{1}{3}$),(else,$p=0$).我们希望我们的模型生成的概率也是这样。
 
 从而，我们使用MLE优化，它的损失函数定义为:
 > $$L=\mathbb{E}_{w\sim \tilde{p}(w|h)}\log p_{\theta}(w|h)$$
@@ -720,3 +726,135 @@ $$=\sum_w (\tilde{p}(w|h)-u_\theta))\nabla (\log u_\theta)$$
 从而，我们推出了，当$k$足够大的时候，$\nabla L^* \approx \nabla L$！
 
 (严格地，是$(k+1)\nabla L^* \approx \nabla L$，别忘了我们之前省略了系数)
+
+##### 3.4.3.2 Make Inferencing Better: Beam Search
+
+在模型生成的时候，我们一般是给定上文，然后使用贪心算法，每次找当前概率最大的词$w_t=\argmax_w{p(w|w_1w_2\dots w_{t-1})}$,然而，这样真的能保证最后生成的句子$w_1w_2\dots w_T$是最好的吗？抛开概率大小和好坏的关系不谈，这个甚至不一定是概率最大的！从数学上来说，如果要找到概率最大的句子，我们需要遍历所有可能的句子，这是不现实的。但是，如果使用贪心算法，又容易因为某个词被"带偏",陷入局部最优解。举个具体例子，假如我们现在有某个模型，给定上文"我爱"，它的概率分布是:(苹果，p=0.45),(大象, p=0.1),(大人, p=0.08),(大妈, p=0.12), (大便, p=0.05), (大军, p=0.05),(大米, p=0.08),(大姐, p=0.07).（按照道理来说，应该生成的是条件概率，但是为了方便，我们直接用概率来表示）,那么，如果我们使用贪心算法，第二个字应该会生成"大"(p=0.55),然后最终就生成了"我爱大妈"，可是这个句子的概率并不是最大的！事实上，最大的句子应该是"我爱苹果"！这就是贪心算法的局限性。
+
+为了解决这个问题，我们引入了Beam Search的概念。Beam Search的想法是，我们不仅仅保留一个最优解，而是保留k个最优解，然后每次生成下一个词的时候，我们生成k个可能的词，然后从中选出概率最大的k个，然后继续生成，直到生成了一个终结符或者达到了最大长度。下图就是一个Beam Search的例子，k=2.
+
+![alt text](image-12.png)
+
+##### 3.4.3.3 Make Understanding Accurate: Contextualized Word Embedding
+
+在我们之前的例子里，Word Embedding都是固定的，然而，同一个词在不同的上下文里有可能差别很大，例如"I can't bear this" 和 "This is a bear"的bear的encoding理论上来说应该很不一样，可是在我们之前的假定里，他们对应同一个向量。基于这个思想，我们可以先训练一个双向RNN模型，然后把它的输出序列和word本身的embedding拼接在一起，作为这个词的新的embedding，这就是ELMo(Embeddings from Language Models),在这个新的embedding下，我们发现模型的能力有了很大的提升。
+
+### 3.5 Machine Translation: From Seq2Seq to Transformer
+
+#### 3.5.1 Emerging: Seq2Seq and Attention
+
+接下来，我们来讨论一个具体的问题: 机器翻译(Machine Translation),并沿着历史的时间线来看看这个问题是如何一步步推动语言模型的发展，最终达到令人惊叹的结果。
+
+在2014年前，机器翻译的问题都在被所谓“专家系统”(Expert System)所主导，这种方法需要大量语言学的专家构建大量的规则来进行翻译，然而，这种方法不仅准确性得不到保证，而且对于每种语言都要不同的人构建不同的系统，代价及其巨大。
+
+2014年，Nerual Machine Translation的出现，给机器翻译界带来了一场巨变。
+
+![alt text](image-13.png)
+
+在NIPS2014上，Seq2Seq模型被提出，它的想法很简单:使用两个RNN $f_{enc}$和$f_{dec}$，分别表示编码器和解码器.编码器读输入的序列，然后把最后一个隐藏层的输出作为解码器的初始隐藏层的输入，然后解码器根据贪心算法(或者beam search)一个一个词地生成输出序列，示意图如下:
+
+![alt text](image-14.png)
+
+通过这个模型，理论上来说它可以记住前面所有的输入保留在隐藏层里，然后根据这个信息生成输出，训练时我们只要采用MLE Training,最大化答案的（对数）概率。所以，这个模型可以有效地解决摘要，对话，翻译的需要，甚至用VAE的思想引入latent variable，还可以拥有Condition Generation的能力$\dots$吗？并不行！
+> 当时这篇论文是oral的论文，我正好在场。宣读论文的时候就有人challenge，说这个方法肯定不work，当时场面还一度尴尬。(Yi Wu)
+
+事实上，最原始的Seq2Seq模型有个很大的问题导致实际上根本没法应用：可供记忆的空间太小了！在经过整个文本以后，$f_{enc}$的输出只有一个隐藏层，这在文本序列很长的时候天然会有信息的损失，就好像把一整本书给一个人看，然后看完以后让它默写翻译一样，当这个人的记忆空间有限的时候，这是非常困难的。然而，我们在实际翻译的时候，真的是这样的吗？并不是！事实上，翻译后的句子和原来的句子有很强的对应关系，而人类在翻译的时候，也大多是先读一遍了解大概结构，然后在针对某些特定的词逐词翻译，基于这个思想，我们能否让机器也这样做呢？这就引出了一个拥有跨时代意义的概念的提出：Attention. 在之后我们会逐渐看到，这个想法是如何一步步推动NLP，乃至AI的发展的。
+
+Attention的概念是这样的：在decoder的第$t$步中，我们本来只能获得上一步的隐藏层信息$h_{t-1}^{dec}$和上一个词$y_{t-1}$，但是我们希望它能在原来的文本里找到它想要的对应信息！于是，我们给它一个额外的信息$h_{att,t-1}=\sum p_{i,t-1}h_i^{enc}$,和$h_{t-1}^{dec}$拼接在一起，然后再输入到解码器中,其中，$p$是一个概率分布，代表此时解码器对于不同位置的关注程度，我们定义
+$$p_{i,t-1}=softmax(h_{t-1}^{dec}\cdot h_i^{enc})$$
+这个定义在直观上可能有点奇怪！为什么$h_{t-1}^{dec}$和$h_i^{enc}$的相似就可以代表它们相关性大呢？这确实不是显然的，但是我们可以认为模型可以学到一个合适的$h$表示让这一点成立，而且这里的小问题也为之后的QKV注意力机制埋下了伏笔，我们将在之后讨论。
+
+![alt text](image-15.png)
+
+注意力机制是语言模型中里程碑式的发现，它极大增加了Seq2Seq模型的能力，同时也让NMT的性能有了质的飞跃，彻底取代了传统的专家系统。同时，注意力机制的实质是关注当前某个特定生成任务对历史输入的依赖性，这个思想不仅可以用于NMT，还可以用于其他生成任务，例如BigGAN等模型中，也引入了这一机制。
+
+在2014到2017年间，应用注意力机制的Seq2Seq模型几乎成了NLP的convention,几乎所有的NLP任务都是基于这一模型上再做微调的结果。直到2017年Google的一篇重磅炸弹论文的推出，彻底打破了已经逐渐平静的NLP界，并接下来在DL，乃至AI领域掀起了一场巨大的风暴。
+
+#### 3.5.2 Enhancing: Transformer
+
+接下来，我们来介绍一下这篇论文的结果:Transformer.
+
+Transformer的想法从论文简单粗暴的标题就可以看出:**Attention is All You Need**(~~这也开启了论文标题党的先河~~) 既然在加上attention 之后，Seq2Seq的模型有了那么大的改善，看上去这完全是attention 的功劳啊，既然如此我们为什么还要原来的RNN呢?于是，transformer的思想就是完全采用attention进行序列转换，而在生成的时候除了原来的attention,再使用对自己的self-attention来代替RNN中上一步隐藏层的作用。
+
+这个想法看上去比较自然，为什么过了整整三年才有人提出？事实上，这个看上去很完美的想法存在着三个问题:
+- 1.我们可以发现，实际上attention的机制并没有体现任何位置信息！然而一个句子中的词的顺序是非常重要的，这个问题在有RNN的时候并没那么关键，因为RNN本身就有位置信息，但是在没有RNN的时候，这个问题就显得尤为突出.
+- 2.attention的机制里，所有东西都是矩阵乘法和加法，导致模型表现力有限，最终只是一个线性的模型，无法表达一些复杂的关系.
+- 3.self-attention看上去很有道理，可是实际生成的时候，我们并不知道后面词的信息，然而attention机制的注意力计算需要用到整个序列的信息，这就导致了一个很大的问题：我们在生成的时候，实际上是在用未来的信息来生成当前的词，这是不合理的。
+
+接下来，我们来看看Transformer是如何解决这些问题的。
+
+**Positional Encoding**
+
+为了解决第一个问题，Transformer引入了位置编码(Positional Encoding)的概念，它的想法是，我们把每个词的embedding再拼接上一个
+向量代表它的位置信息。这听上去很简单，可是要对任意长的序列设计
+位置编码，还是有一定的技巧的。Transformer 使用了一种很巧妙的方法，它使用了正弦和余弦函数来编码位置信息，具体地，对于位置$pos$，我们定义
+$$PE_{(pos,2i)}=sin(pos/10000^{2i/d})$$
+$$PE_{(pos,2i+1)}=cos(pos/10000^{2i/d})$$
+这个$d$维的向量PE就是位置编码，然后我们把它和词的embedding拼接在一起，就得到了新的embedding.
+
+值得一提的是，在原始论文中的这个位置编码并不是最优的，之后有很多论文研究了更好的位置编码，例如可学习的位置编码和相对位置编码等，这里就不再赘述。
+
+**Activation Layer**
+
+上面提到的第二个问题其实很好解决：我们只要在每个attention层后面加上一个全连接层，然后再加上一个激活函数就可以了，这样就可以提高模型的表现力。
+
+**Masked Self-Attention**
+
+对于第三个问题，一个简单的方法是每次一个一个词生成，然后计算关于前面的注意力系数，可是这样无法并行。于是，Transformer引入了Masked Self-Attention的概念，它的想法是，我们在计算attention的时候，把未来的信息乘上一个只含0,1的mask，把“非法信息”mask掉，这样就不会用到未来的信息了。也就是说，我们先算出所有的$p_{i,j}$,然后把$p_{i,j}$乘上一个下三角全为1,其余为0的mask矩阵，然后再进行softmax，这样就可以保证生成的时候不会用到未来的信息。
+
+**Multi-Headed K-Q-V Attention**
+
+除了解决了上面的三个问题以外，transformer还对注意力机制做了一个很大的改进。还记得我们上面就提出过的问题：为什么$h_{t-1}^{dec}$和$h_i^{enc}$的相似就可以代表它们相关性大呢？事实上，直观上来说，我们也应该像学习word embedding把一个词分为word embedding和context embedding一样，分开处理。具体地说，我们给一个词建立三个hidden state: Key, Query, Value， 直观地说key表示当前存储着什么信息，Query表示当前想要什么信息，Value表示当前的信息。基于这个，我们的attention机制可以写成:
+$h_{att}=\sum_i softmax(Q_t\cdot K_i)V_i$
+也就是说我们寻找"当前想要的"和"当前存储的"尽可能接近的信息的value给到解码器，这就很符合我们的直觉了。
+
+前面在介绍attention的时候，你还有可能注意到另一个不完全符合直觉的地方：把所有的$h_i^{enc}$加权求和这个操作真的合理吗？比如说如果当前词的翻译依赖于前面的两个词，那我把这两个词对应的value加权和，会不会导致混乱？于是，Transformer引入了Multi-Headed Attention的概念，它的想法是，我们不只是用一个attention，而是用多个attention，然后把它们的输出拼接在一起而不是加权和，这样就可以保证它可以同时注意到不同的信息。
+
+具体地，为了不增加维度，我们把向量$Q,K,V$都拆成$l$份，然后让
+$h_{att}=cat(h^1,h^2,\dots,h^l)$,其中$h^k=\sum_i softmax(Q^k_t\cdot K^k_i)V^k_i$.
+
+这两个改进就被称为Multi-Headed Q-K-V Attention，也是Transformer的核心。
+
+**Architecture Modification**
+
+除了上面的改进以外，Transformer还做了一些架构上的改进，例如在每个attention层后面加上一个全连接层，然后再加上一个残差连接和Layer Normalization，这样可以提高模型的表现力，另外，有一个小问题是当$d$足够大的时候，我们的$Q\cdot K$的量级可能会变大，导致一些梯度消失的问题(因为我们要取softmax! 想象假如两个词的$Q\cdot K$分别是1,2,那么后者的概率应该是前者的$\frac{1}{e}$,这听上去还可以，但是如果变成了100,200,那后者的概率就变成了前者的$\frac{1}{e^{100}}$!).
+
+于是, Transformer引入了Scaled Dot-Product Attention的概念，也就是把$h^k$中的系数$softmax(Q^k_t\cdot K^k_i)$换成$softmax(\frac{Q^k_t\cdot K^k_i}{\sqrt{d/l}})$,这样就有效保证了模型对不同输入维度的稳定性。
+
+从而，结合上面所有内容，我们就得到了大名鼎鼎的Transformer模型，这是它的结构图：
+
+![alt text](image-16.png)
+
+#### 3.5.3 Blooming: Applications, Pretrained Transformer, and LLM
+
+Transformer刷新了当前NLP领域的几乎所有state-of-the-art,并迅速在NLP领域占据了统治地位。同时，transformer原架构的一些问题也在被不断改进，例如注意力矩阵的$d^2$大小所带来的计算复杂性问题可以利用其稀疏性进行优化等。
+
+同时，除了NLP领域，甚至图片处理领域也在被transformer占据，ViT(Vision Transformer)是google的一项工作，其思想就是把图片拆成16 $\times$ 16的patch，然后把每个patch当成一个word来处理，这篇名叫An Image is Worth 16x16 Words的论文也在CV领域引起了巨大的反响，刷新了CV领域的几乎所有state-of-the-art. CVPR2021的最佳论文Swin Transformer也是在这之上，通过分层的方法强化了不同patch之间相邻关系，取得了更好的效果。
+
+接下来，我们将介绍另一个非常重要的，甚至改变了人类生活的应用: Pretrained Transformer.
+
+Pretrained Transformer的想法也是直接的，还记得之前的ELMo吗？它运用双向的RNN给word embedding增加上下文信息，从而起到了提高模型性能的效果。而Transformer的结构和它也很类似，并且能力更为强大，那么，预训练好的transformer结构是不是可以起到很好的作用呢？既然transformer有两个结构，一个是encoder，一个是decoder，那么我们可以只用encoder部分，也可以都用，也可以只用decoder部分，这就引出了三种不同的预训练模型，我们将分别介绍。注意到encoder和decoder的结构是类似的，最主要的区别就是encoder是双向的，也就是说，它可以看到整个句子，而decoder是单向的，只能看到前面的词，这就导致了encoder的预训练模型更适合做一些embedding任务，而decoder的预训练模型更适合做生成任务。
+
+**BERT**
+
+BERT(Bidirectional Encoder Representations from Transformers)是Google在2018年提出的预训练模型，它就是预训练了一个decoder,而训练的想法是，我们把一个句子中的某些词mask掉，然后让模型预测这些词，这样就可以让模型学到双向的信息，这个任务事实上和word embedding是有些类似的，可是现在我们的模型架构已经变得很强大了。事实上，为了激发模型的能力，BERT的具体训练目标是这样一个变态的任务：对于语料库中的句子，我们mask掉80%的词，然后再把10%的词随机换成另一个词，然后让模型预测15%的我们mask掉的词。
+
+在这个逆天的任务下训练出来的decoder在翻译领域的benchmark上全面超越了之前的所有模型，体现了transformer的强大能力。
+
+**T5**
+
+T5(Text-to-Text Transfer Transformer)是Google在2019年提出的预训练模型，它的训练任务是给定一些问题以及回答，然后把问题和回答中的一些词都mask掉，然后让模型预测。这样就可以同时训练encoder和decoder，而且可以在很多任务上都有很好的表现。在训练的过程中，人们发现T5模型有了一些能力，可以预测一些并不在语料库中的词，这时候，Transformer的神奇能力已经开始显现了。
+
+**Pretrained Transformer(Decoder)**
+
+最后，我们来介绍预训练的decoder, 由于decoder的auto-regressive的特性，我们可以用它来做生成任务，所以，它还有一个广为人知的名字:**Generative Pretrained Transformer(GPT)**.
+
+Open AI 在2020年的文章：GPT-3: Language models are few-shot learners 中表述了这个模型的惊人性质，它可以在只给出几个例子的情况下，完成很多任务，例如翻译，摘要，对话等。并且随着模型的参数的增加，它的能力也在不断涌现，在视频等领域甚至也起到了惊人的效果。同时，加大参数量带来的惊人变化也使LLM(Large Language Model)成为了当前NLP领域的重大热点。
+
+> 基于LLM的很多应用，甚至已经开始改变人们的生活方式：例如，ChatGPT可以和人进行对话，DALL-E可以根据描述生成图片，GPT-3可以完成很多任务，甚至可以写出一篇文章，这些都是LLM的应用。(Github Copilot)
+
+
+
+
+
+
