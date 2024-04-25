@@ -2,7 +2,7 @@
 
 ## 0. Introduction
 
-### 0.1 General Introduction Of Deep Learning
+### 0.1 General Introduction To Deep Learning
 > Deep Learning is a class of machine learning methods that use neural networks to learn representations from raw data.
 
 什么是 deep learning? 简单的说， deep learning 是利用深度神经网络学习数据的表示的一种机器学习方法。这里的“深度”指的是神经网络的层数，而“学习数据的表示”指的是神经网络的参数，也就是说，我们通过调整神经网络的参数来学习数据的表示。
@@ -641,7 +641,7 @@ tldr:这一小节讲了一个加速训练的方法:NCE,它的想法和之前类�
 > $$c_{\theta}(w,h):模型对于w和h输出的结果$$
 > $$u_{\theta}(w,h)=e^{c_{\theta}(w,h)}:模型预测的未归一化的概率$$
 > $$p_{\theta}(w|h)=softmax(c_{\theta})=\frac{u_{\theta}(w,h)}{Z_{\theta,h}}:模型预测的概率$$
-> $$Z_{\theta,h}=\sum_{w} c_{\theta}(w,h):归一化因子$$
+> $$Z_{\theta,h}=\sum_{w} u_{\theta}(w,h):归一化因子$$
 这里要注意，我们之后会用到很多的不同的概率分布，请不要弄混，另外下标带$\theta$说明与模型有关，否则与模型无关. 如果你在中间某步突然不能理解，请检查一下是不是弄混了不同的概率分布！
 
 我们的目标是:
@@ -737,7 +737,7 @@ $$=\sum_w (\tilde{p}(w|h)-u_\theta))\nabla (\log u_\theta)$$
 
 ##### 3.4.3.3 Make Understanding Accurate: Contextualized Word Embedding
 
-在我们之前的例子里，Word Embedding都是固定的，然而，同一个词在不同的上下文里有可能差别很大，例如"I can't bear this" 和 "This is a bear"的bear的encoding理论上来说应该很不一样，可是在我们之前的假定里，他们对应同一个向量。基于这个思想，我们可以先训练一个双向RNN模型，然后把它的输出序列和word本身的embedding拼接在一起，作为这个词的新的embedding，这就是ELMo(Embeddings from Language Models),在这个新的embedding下，我们发现模型的能力有了很大的提升。
+在我们之前的例子里，Word Embedding都是固定的，然而，同一个词在不同的上下文里有可能差别很大，例如"I can't bear this" 和 "This is a bear"的bear的encoding理论上来说应该很不一样，可是在我们之前的假定里，他们对应同一个向量。基于这个思想，我们可以先训练正向/反向两个RNN模型，然后把它的隐藏层序列和word本身的embedding拼接在一起，作为这个词的新的embedding，这就是ELMo(Embeddings from Language Models),在这个新的embedding下，我们发现模型的能力有了很大的提升。
 
 ### 3.5 Machine Translation: From Seq2Seq to Transformer
 
@@ -800,7 +800,7 @@ $$PE_{(pos,2i+1)}=cos(pos/10000^{2i/d})$$
 
 **Masked Self-Attention**
 
-对于第三个问题，一个简单的方法是每次一个一个词生成，然后计算关于前面的注意力系数，可是这样无法并行。于是，Transformer引入了Masked Self-Attention的概念，它的想法是，我们在计算attention的时候，把未来的信息乘上一个只含0,1的mask，把“非法信息”mask掉，这样就不会用到未来的信息了。也就是说，我们先算出所有的$p_{i,j}$,然后把$p_{i,j}$乘上一个下三角全为1,其余为0的mask矩阵，然后再进行softmax，这样就可以保证生成的时候不会用到未来的信息。
+对于第三个问题，一个简单的方法是每次一个一个词生成，然后计算关于前面的注意力系数，可是这样无法并行。于是，Transformer引入了Masked Self-Attention的概念，它的想法是，我们在计算attention的时候，把未来的信息乘上一个只含0,1的mask，把“非法信息”mask掉，这样就不会用到未来的信息了。也就是说，我们先算出所有的$p_{i,j}$,然后把$p_{i,j}$乘上一个下三角全为1,其余为0的mask矩阵，然后再对非零部分进行softmax，这样就可以保证生成的时候不会用到未来的信息，并且这是可以并行计算的。（实际实现上其实有另外一种更简单的方法：把$p_{i,j}$加上一个下三角全为0,其余为$-\infty$的矩阵，这样就可以让softmax时需要mask的部分变成0）
 
 **Multi-Headed K-Q-V Attention**
 
@@ -810,7 +810,7 @@ $h_{att}=\sum_i softmax(Q_t\cdot K_i)V_i$
 
 前面在介绍attention的时候，你还有可能注意到另一个不完全符合直觉的地方：把所有的$h_i^{enc}$加权求和这个操作真的合理吗？比如说如果当前词的翻译依赖于前面的两个词，那我把这两个词对应的value加权和，会不会导致混乱？于是，Transformer引入了Multi-Headed Attention的概念，它的想法是，我们不只是用一个attention，而是用多个attention，然后把它们的输出拼接在一起而不是加权和，这样就可以保证它可以同时注意到不同的信息。
 
-具体地，为了不增加维度，我们把向量$Q,K,V$都拆成$l$份，然后让
+具体地，为了不增加维度，我们把向量$Q,K,V$都拆成$l$份(原文中$l=8$)，然后让
 $h_{att}=cat(h^1,h^2,\dots,h^l)$,其中$h^k=\sum_i softmax(Q^k_t\cdot K^k_i)V^k_i$.
 
 这两个改进就被称为Multi-Headed Q-K-V Attention，也是Transformer的核心。
