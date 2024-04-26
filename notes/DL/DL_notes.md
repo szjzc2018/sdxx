@@ -758,7 +758,7 @@ $$Pr(y,+|x_{-k}x_{-k+1}...x_{-1}*x_1x_{k-1}x_{k})=\prod_{i=-k,i\neq 0}^k{\frac{1
 从而，我们就可以用MLE训练这个模型了！但事实上，如果你足够细心，你可能会发现一点问题，如果我们要优化
 $$\frac{1}{|C|}\sum_{c=(x_{-k}x_{-k+1}...x_{-1}yx_1x_{k-1}x_{k})\in C} \log Pr(c,+)$$
 的话，事实上我们的最优解总是让所有向量都一样，这样可以让每个概率都最大化！问题在哪里？我们发现对于一个二分类问题，我们不仅需要正例，还需要负例，但是我们的模型中并没有负例！于是，我们引入了负采样(negative sampling)的概念：我们对于上下文，随机采样作为负例，然后我们希望
-$$L(w,c) = \sum_{c=(x,y)\in D^+} \log Pr(c,+)-\sum_{c=(x,y)\in D^-} \log Pr(c,-)$$
+$$L(w,c) = \sum_{c=(x,y)\in D^+} \log Pr(c,+)+\sum_{c=(x,y)\in D^-} \log Pr(c,-)$$
 尽量大，其中$D^+$是正例集合，$D^-$是负例集合。
 
 另一种结构是Skip-gram,它的想法是，我们希望通过一个词来预测它的上下文，从而学到一个好的embedding.具体地，我们在训练语料$x_{-k}x_{-k+1}\dots x_{-1}yx_1 \dots x_{k-1}x_{k}$的中的${x_i}$里随机选择$R$个词作为$y$的上下文$x$,然后把这些$(x,y)$作为正例，然后随机采样$R$个词构成$\tilde{x}$,让$(\tilde{x},y)$作为负例，然后进行一样的训练。
@@ -972,9 +972,9 @@ Pretrained Transformer的想法也是直接的，还记得之前的ELMo吗？它
 
 **BERT**
 
-BERT(Bidirectional Encoder Representations from Transformers)是Google在2018年提出的预训练模型，它就是预训练了一个decoder,而训练的想法是，我们把一个句子中的某些词mask掉，然后让模型预测这些词，这样就可以让模型学到双向的信息，这个任务事实上和word embedding是有些类似的，可是现在我们的模型架构已经变得很强大了。事实上，为了激发模型的能力，BERT的具体训练目标是这样一个变态的任务：对于语料库中的句子，我们mask掉80%的词，然后再把10%的词随机换成另一个词，然后让模型预测15%的我们mask掉的词。
+BERT(Bidirectional Encoder Representations from Transformers)是Google在2018年提出的预训练模型，它就是预训练了一个decoder,而训练的想法是，我们把一个句子中的某些词mask掉，然后让模型预测这些词，这样就可以让模型学到双向的信息，这个任务事实上和word embedding是有些类似的，可是现在我们的模型架构已经变得很强大了。事实上，为了激发模型的能力，BERT的具体训练目标是这样一个任务:找出15%的词，然后对这些词做如下操作:80%概率变成[MASK]，10%概率变成随机词，10%概率不变，然后让模型预测所有的[MASK]所对应的词。
 
-在这个逆天的任务下训练出来的decoder在翻译领域的benchmark上全面超越了之前的所有模型，体现了transformer的强大能力。
+在这个任务下训练出来的decoder在翻译领域的benchmark上全面超越了之前的所有模型，体现了transformer的强大能力。
 
 **T5**
 
