@@ -129,9 +129,18 @@ $$f(x)_{c_2,i,j} = \sum_{k=1}^{k_1}\sum_{l=1}^{k_2}W_{c_1,c_2,k,l}x_{c_1,i+k,j+l
 
 PS: 在卷积的“扫描”过程中，我们每次移动的步长也可以不为1,这样就可以起到降维的作用，步长被称为stride.一般地说，如果原图大小为$n\times m$,卷积核大小为$k_1\times k_2$,stride为$s_1\times s_2$,那么输出的特征图大小为$\lfloor \frac{n-k_1}{s_1} \rfloor \times \lfloor \frac{m-k_2}{s_2} \rfloor$. 为了调整输出的大小，我们可以在原图的周围加一圈0，这被称为padding. 如果padding的大小为$p_1\times p_2$（$p_1,p_2$分别是上下,左右的padding行/列数）
 ,那么输出的特征图大小为$\lfloor \frac{n-k_1+2p_1}{s_1} \rfloor \times \lfloor \frac{m-k_2+2p_2}{s_2} \rfloor$.
+
+其中in_channels是输入的通道数（特征图的个数），out_channels是输出的通道数，kernel_size是卷积核的大小，stride是步长，padding是padding的大小。
+
 ### 1.2.3 Batchnorm Layer
 
 Batchnorm是一种用来稳定训练的层，它和pooling层一样没有可训练参数，作用就是把每一层的输出都归一化到均值为0，方差为1的分布，这样可以使得每一层的输出都在一个比较稳定的范围内，从而避免数值过大或者过小导致的梯度消失或者爆炸问题。
+
+在pytorch中，batchnorm层可以用如下的函数实现：
+```python
+torch.nn.BatchNorm2d(num_features)
+```
+其中num_features是输入的通道数。
 
 ### 1.3 Prevent Overfitting
 
@@ -173,6 +182,132 @@ $$ x_i = concat(x_{i-1},C_{i-1}(x_{i-1}))$$
 
 > Densenet 是CVPR17的best paper, 是姚班学长做出来的，但是颁奖的时候他们在外面旅游导致没人领奖，场面一度尴尬.(Yi Wu)
 
+### 1.5 Code Implementation
+
+接下来，我们展示一些基于Pytorch的简单代码实现，由于作者水平有限，如果代码哪里有bug请不要骂我.
+
+全连接神经网络:
+```python
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
+
+class Net(nn.Module):
+    def __init__(self):
+        super(Net, self).__init__()
+        self.fc1 = nn.Linear(28*28, 512)
+        self.fc2 = nn.Linear(512, 10)
+    def forward(self, x):
+        x = x.view(-1, 28*28)
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
+```
+卷积神经网络：
+```python
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
+
+class Net(nn.Module):
+    def __init__(self):
+        super(Net, self).__init__()
+        self.conv1 = nn.Conv2d(1, 32, 3, 1)
+        self.conv2 = nn.Conv2d(32, 64, 3, 1)
+        self.fc1 = nn.Linear(9216, 128)
+        self.fc2 = nn.Linear(128, 10)
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = F.max_pool2d(x, 2, 2)
+        x = F.relu(self.conv2(x))
+        x = F.max_pool2d(x, 2, 2)
+        x = x.view(-1, 9216)
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
+```
+ResNet:
+```python
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
+
+class ResBlock(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(ResBlock, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels, 3, 1, 1)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, 3, 1, 1)
+    def forward(self, x):
+        x1 = F.relu(self.conv1(x))
+        x2 = F.relu(self.conv2(x1))
+        return x+x2
+
+class ResNet(nn.Module):
+    def __init__(self):
+        super(ResNet, self).__init__()
+        self.conv1 = nn.Conv2d(1, 32, 3, 1, 1)
+        self.res1 = ResBlock(32, 32)
+        self.res2 = ResBlock(32, 32)
+        self.fc = nn.Linear(28*28*32, 10)
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = self.res1(x)
+        x = self.res2(x)
+        x = x.view(-1, 28*28*32)
+        x = self.fc(x)
+        return x
+```
+DenseNet:
+```python
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
+
+class DenseBlock(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(DenseBlock, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels, 3, 1, 1)
+        self.conv2 = nn.Conv2d(in_channels+out_channels, out_channels, 3, 1, 1)
+    def forward(self, x):
+        x1 = F.relu(self.conv1(x))
+        x2 = F.relu(self.conv2(torch.cat([x, x1], 1)))
+        return torch.cat([x, x1, x2], 1)
+
+class TransitionLayer(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(TransitionLayer, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, 1, 1)
+        self.pool = nn.AvgPool2d(2, 2)
+    def forward(self, x):
+        x = F.relu(self.conv(x))
+        x = self.pool(x)
+        return x
+
+class DenseNet(nn.Module):
+    def __init__(self):
+        super(DenseNet, self).__init__()
+        self.conv1 = nn.Conv2d(1, 32, 3, 1, 1)
+        self.dense1 = DenseBlock(32, 32)
+        self.trans1 = TransitionLayer(96, 64)
+        self.dense2 = DenseBlock(64, 32)
+        self.trans2 = TransitionLayer(96, 64)
+        self.fc = nn.Linear(7*7*64, 10)
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = self.dense1(x)
+        x = self.trans1(x)
+        x = self.dense2(x)
+        x = self.trans2(x)
+        x = x.view(-1, 7*7*64)
+        x = self.fc(x)
+        return x
+```
+
+
 ## 2. Generative Models
 
 ### 2.0 Introduction
@@ -204,7 +339,7 @@ $$L=\frac{1}{|P|}\sum_{x\in P}\log p(x)$$
 
 既然我们的模型就是一个概率分布$p(x)$, 那么最简单粗暴的方法当然就是直接对每个$x$用某个函数来表示他的概率，同样为了让相对大小在正常的量级上方便计算(同时也受物理学方面的一些启发，以及早期的一些network结构的研究)，我们考虑去对于每个$x$定义一个能量函数$E(x)$正比于 $-\log p(x)$，这唯一确定了概率分布$p(x)=\frac{1}{Z}e^{-E(x)}$，其中$Z$是归一化因子。
 
-##### 1.1 Hopfield Network:Intro
+##### 2.1.1.1 Hopfield Network:Intro
 
 一个简单的典型例子是Hopfield Network,它的输出是$\{-1,1\}^n$ 中的向量，而能量函数被定义为$E(x)=-\frac{1}{2}x^TWx$，其中$W$是一个对称矩阵，也是我们需要训练的参数。
 
@@ -215,7 +350,7 @@ $$L=\frac{1}{|P|}\sum_{x\in P}\log p(x)$$
 
 这两个问题对一般的energy-based model并没有通用的解决方案，事实上，这也是energy-based model最大的问题之一。接下来我们针对Hopfield Network, 给出一个解决方案，这个解决方案也可以适用到一类比较好的$E(x)$的energy-based model上。
 
-##### 1.2 Hopfield Network: Solving the problem
+##### 2.1.1.2 Hopfield Network: Solving the problem
 
 我们先写一下一般的energy-based model的损失函数：
 $$ L=\frac{1}{|P|}\sum_{x\in P}\log \frac{e^{-E(x)}}{Z}=\frac{1}{|P|}\sum_{x\in P}(-E(x)-\log Z)$$
@@ -245,15 +380,15 @@ $$\nabla_{W}(L)=\frac{1}{|P|}(\sum_{x\in P}x^Tx)-\mathbb{E}_{x \in D}x^Tx$$
 
 接下来，我们将介绍一系列sampling的方法，用来解决sampling的问题。形式化地，我们现在有一个很大的集合$X$,以及一个$X$上的概率分布$D$,但是我们可以计算的只是对于单个的$x$所对应的未归一化的概率$p(x)$,我们希望从$D$中采样,或者计算某些函数在$D$上的期望。
 
-##### 1.3 Sampling Methods
+##### 2.1.1.3 Sampling Methods
 
-###### 1.3.1 Gibbs Sampling
+###### 2.1.1.3.1 Gibbs Sampling
 
 Gibbs Sampling是一种常见的采样方法，它的基本思想是，我们先随机取一个$x=(x_1,\dots,x_n)$,然后以概率$(x_i|x_1,\dots,x_{i-1},x_{i+1},\dots,x_n)$更新$x_i$的值，重复直到收敛（in pratice, 可能会出现在某个小范围震荡不收敛的情况，这个时候我们近似认为这个小区域内每个都差不多，于是实际的过程就是重复更新足够多次然后取一个）。
 
 这在给定(n-1)个分量后，$p(x_1,x_2,\dots,x_{i-1},x_{i+1},\dots,x_n)$的条件概率是一个简单的分布的时候是非常有效的，例如在Hopfield Network中，条件分布事实上就是一个两点分布(别忘了我们的定义$x_i\in\{-1,1\}$),然而，对于一般的条件概率不好算的连续分布，我们还需要更多的方法来计算。
 
-###### 1.3.2 Importance Sampling
+###### 2.1.1.3.2 Importance Sampling
 
 Importance Sampling 用来解决计算在某个分布下估计函数期望的问题，具体地，如果我们要估计$\mathbb{E}_{x \sim p}f(x)$, 但从$p$
 中采样及其困难，因为我们只有未归一化的概率而没有归一化系数。那么，我们可以找一个简单，好采样的分布$q$, 然后估计$\mathbb{E}_{x \sim q}f(x)\frac{p(x)}{q(x)}$，这两个期望在数学上是相等的，然而通过“换元”我们得到了一个更好采样的分布。
@@ -266,7 +401,7 @@ Importance Sampling 用来解决计算在某个分布下估计函数期望的问
 
 从这个例子里可以看出，因为我们最理想的情况其实是均匀随机取出一个水果采样，所以最优策略是要让每个小箱子里水果数都一样，也就是$p$和$q$尽可能接近。从数学上可以证明，当它们正比时，估计值的方差最小。
 
-###### 1.3.2 Metropolis-Hastings Algorithm
+###### 2.1.1.3.3 Metropolis-Hastings Algorithm
 
 Metropolis-Hastings Algorithm 是Gibbs Sampling 的推广。想象我们在Gibbs Sampling的时候，相当于构造了一个随机过程，然后希望这个随机过程最终收敛到我们的概率分布。那么，我们是否可以构造一个更一般的随机过程，使得它最终收敛到我们的概率分布呢？这就是Metropolis-Hastings Algorithm的思想。
 
@@ -274,7 +409,7 @@ Metropolis-Hastings Algorithm 是Gibbs Sampling 的推广。想象我们在Gibbs
 $$A(x\rightarrow x')=\min\{1,\frac{p(x')q(x|x')}{p(x)q(x'|x)}\}$$
 最终，我们的随机过程定义为：对当前的$x$,在$q(x'|x)$下采样一个$x'$,然后以概率$A(x\rightarrow x')$接受$x'$,否则保持$x$，重复这个过程直到收敛。可以证明，在$p$满足一些连续性条件的情况下，这个随机过程的稳定分布是我们的概率分布。
 
-##### 1.4 Boltzmann Machine
+##### 2.1.1.4 Boltzmann Machine
 
 现在我们有了采样方法，终于可以来训练基于Hopfield Network的Boltzmann Machine了！ 具体的训练过程如下
 - 1.初始化$W$
